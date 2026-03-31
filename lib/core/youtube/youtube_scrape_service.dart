@@ -554,26 +554,93 @@ class YouTubeScrapeService {
   }
 
   LiveStreamInfo _extractStreamInfo(String videoId, String html) {
-    final playerMatch = RegExp(
-      r'var\s+ytInitialPlayerResponse\s*=\s*({.+?})\s*;',
-      dotAll: true,
-    ).firstMatch(html);
-    if (playerMatch != null) {
-      final data = jsonDecode(playerMatch.group(1)!) as Map<String, dynamic>;
-      final videoDetails = data['videoDetails'] as Map<String, dynamic>?;
-      final microformat = data['microformat']?['playerMicroformatRenderer']
-          as Map<String, dynamic>?;
-      return LiveStreamInfo(
-        videoId: videoId,
-        liveChatId: videoId,
-        title: videoDetails?['title'] as String? ?? '',
-        ownerChannelId: videoDetails?['channelId'] as String? ?? '',
-        ownerChannelName: videoDetails?['author'] as String? ??
-            microformat?['ownerChannelName'] as String? ??
-            '',
-      );
+    // 1. Try ytInitialPlayerResponse → videoDetails (legacy, may still work
+    //    on some page variants).
+    final playerJson = _extractJsonVar(html, 'ytInitialPlayerResponse');
+    if (playerJson != null) {
+      try {
+        final data = jsonDecode(playerJson) as Map<String, dynamic>;
+        final videoDetails = data['videoDetails'] as Map<String, dynamic>?;
+        final microformat = data['microformat']?['playerMicroformatRenderer']
+            as Map<String, dynamic>?;
+        if (videoDetails != null) {
+          return LiveStreamInfo(
+            videoId: videoId,
+            liveChatId: videoId,
+            title: videoDetails['title'] as String? ?? '',
+            ownerChannelId: videoDetails['channelId'] as String? ?? '',
+            ownerChannelName: videoDetails['author'] as String? ??
+                microformat?['ownerChannelName'] as String? ??
+                '',
+          );
+        }
+      } catch (_) {
+        // JSON decode failed — try next source.
+      }
     }
 
+    // 2. Try ytInitialData → twoColumnWatchNextResults (current YouTube
+    //    layout as of 2025+).
+    final dataJson = _extractJsonVar(html, 'ytInitialData');
+    if (dataJson != null) {
+      try {
+        final data = jsonDecode(dataJson) as Map<String, dynamic>;
+        final contents = (data['contents']
+                ?['twoColumnWatchNextResults']
+                ?['results']
+                ?['results']
+                ?['contents'] as List?)
+            ?.cast<Map<String, dynamic>>();
+        if (contents != null) {
+          String? title;
+          String? ownerChannelId;
+          String? ownerChannelName;
+
+          for (final item in contents) {
+            // Video title
+            final vpir = item['videoPrimaryInfoRenderer']
+                as Map<String, dynamic>?;
+            if (vpir != null) {
+              final runs = vpir['title']?['runs'] as List?;
+              if (runs != null && runs.isNotEmpty) {
+                title = runs.map((r) => r['text'] as String).join();
+              }
+            }
+
+            // Channel name + id
+            final vsir = item['videoSecondaryInfoRenderer']
+                as Map<String, dynamic>?;
+            if (vsir != null) {
+              final owner = vsir['owner']?['videoOwnerRenderer']
+                  as Map<String, dynamic>?;
+              if (owner != null) {
+                final nameRuns = owner['title']?['runs'] as List?;
+                if (nameRuns != null && nameRuns.isNotEmpty) {
+                  ownerChannelName =
+                      nameRuns.map((r) => r['text'] as String).join();
+                  ownerChannelId = nameRuns.first['navigationEndpoint']
+                      ?['browseEndpoint']?['browseId'] as String?;
+                }
+              }
+            }
+          }
+
+          if (title != null && title.isNotEmpty) {
+            return LiveStreamInfo(
+              videoId: videoId,
+              liveChatId: videoId,
+              title: title,
+              ownerChannelId: ownerChannelId ?? '',
+              ownerChannelName: ownerChannelName ?? '',
+            );
+          }
+        }
+      } catch (_) {
+        // JSON decode failed — try next source.
+      }
+    }
+
+    // 3. Fallback: HTML meta tags.
     final document = html_parser.parse(html);
     final title = document
         .querySelector('meta[property="og:title"]')

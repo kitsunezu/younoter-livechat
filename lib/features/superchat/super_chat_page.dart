@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/database/database.dart';
 import '../../core/providers/providers.dart';
 import '../../core/youtube/currency_utils.dart';
+import '../../core/youtube/live_chat_manager.dart';
 import '../../l10n/app_localizations.dart';
 import '../chat/chat_message_text.dart';
 import '../viewers/viewer_detail_panel.dart';
@@ -14,11 +15,14 @@ class SuperChatPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final manager = ref.watch(liveChatManagerProvider);
+    // Watch connection status so the page rebuilds on connect/disconnect.
+    final statusAsync = ref.watch(chatStatusProvider);
+    final status = statusAsync.valueOrNull ?? ChatConnectionStatus.disconnected;
     final liveChatId = manager.liveChatId;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    if (liveChatId == null) {
+    if (liveChatId == null || status != ChatConnectionStatus.connected) {
       return Center(
         child: Text(
           AppLocalizations.of(context)!.noMessages,

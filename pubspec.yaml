@@ -65,3 +65,4 @@ msix_config:
   identity_name: com.younoter.younoter
   msix_version: 1.0.0.0
   install_certificate: false
+  logo_path: assets/yonoter-logo.png

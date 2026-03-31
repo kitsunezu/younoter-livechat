@@ -1,12 +1,17 @@
 # YouNoter
 
+<p align="center">
+  <img src="assets/yonoter-logo.png" alt="YouNoter Logo" width="160" />
+</p>
+
 A Flutter desktop app for monitoring and managing YouTube Live chat in real time — no API key required.
 
 ## Features
 
 - **Live Chat Monitor** — Connects to any YouTube Live stream and polls chat messages in real time
 - **Super Chat Management** — Tracks all Super Chats and Super Stickers with amount, currency, tier color, and read/processed status
-- **Viewer Profiles** — Builds a local database of viewers with name history, notes, message count, and Super Chat totals
+- **Viewer Profiles** — Builds a local database of viewers with name history, notes, message count, and Super Chat totals; automatically resolves `@handles` to display names
+- **Handle → Username Resolution** — Converts YouTube `@handle` identifiers to human-readable usernames and keeps them in sync across sessions
 - **Dashboard** — Statistics overview: unique viewer count, message count, Super Chat distribution by currency and tier
 - **Membership Events** — Captures new member joins, gifted memberships, and milestone messages
 - **No API Key Required** — Works out of the box by scraping public chat data; optionally provide a YouTube Data API v3 key for higher rate limits
@@ -25,7 +30,30 @@ Grab the latest release from the [Releases page](https://github.com/kitsunezu/yo
 
 ## Screenshots
 
-> _Add screenshots here_
+### Chat
+Real-time live chat feed. Super Chat messages are highlighted inline with their tier color and amount.
+
+![Chat](assets/chatroom.png)
+
+### Super Chat
+Full Super Chat history with filter (All / Unread / Read), sort by time, amount, or status, and one-click mark-as-read.
+
+![Super Chat](assets/superchat.png)
+
+### Dashboard
+Session overview — total messages, Super Chat count and amount, active viewers, new members, gifts, and milestones. Includes Top Donors ranking and Super Chat distribution charts.
+
+![Dashboard](assets/dashboard.png)
+
+### Viewers
+Searchable viewer database across all sessions. Click any viewer to open their profile with channel info, notes, Super Chat history, and full chat history.
+
+![Viewers](assets/viewer.png)
+
+### Membership
+Dedicated feed for membership events — new joins, gifted memberships, and milestone messages with summary counters at the top.
+
+![Membership](assets/membership.png)
 
 ## Requirements
 
