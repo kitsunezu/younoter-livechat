@@ -3,11 +3,12 @@
   <Product Id="*"
            Name="YouNoter"
            Language="1033"
+           Codepage="65001"
            Version="$(var.Version)"
            Manufacturer="YouNoter"
            UpgradeCode="A8B3C4D5-E6F7-4A8B-9C0D-E1F2A3B4C5D6">
 
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" SummaryCodepage="65001" />
 
     <MajorUpgrade DowngradeErrorMessage="A newer version of YouNoter is already installed." />
     <MediaTemplate EmbedCab="yes" />
