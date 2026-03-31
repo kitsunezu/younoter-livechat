@@ -4,6 +4,11 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -31,23 +36,67 @@ jobs:
       - name: Create MSIX installer
         run: dart run msix:create --install-certificate false --build-windows false
 
+      - name: Test MSIX installation
+        shell: pwsh
+        run: |
+          # Enable sideloading (AllowAllTrustedApps)
+          $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
+          if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+          Set-ItemProperty -Path $regPath -Name "AllowAllTrustedApps" -Value 1 -Type DWord -Force
+
+          # Find the generated MSIX
+          $msix = Get-ChildItem "build\windows\x64\runner\Release\" -Filter "*.msix" | Select-Object -First 1
+          if (-not $msix) { Write-Error "MSIX not found in output directory"; exit 1 }
+          Write-Host "Found MSIX: $($msix.Name)"
+
+          # Extract the signing certificate from the MSIX
+          $sig = Get-AuthenticodeSignature -FilePath $msix.FullName
+          if (-not $sig.SignerCertificate) { Write-Error "MSIX is not signed"; exit 1 }
+          $sig.SignerCertificate | Export-Certificate -FilePath "signer.cer" -Type CERT | Out-Null
+          Import-Certificate -FilePath "signer.cer" -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
+          Import-Certificate -FilePath "signer.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
+          Write-Host "Trusted certificate: $($sig.SignerCertificate.Subject)"
+
+          # Install the MSIX
+          Add-AppPackage -Path $msix.FullName
+          Start-Sleep -Seconds 2
+
+          # Verify the package appears in installed packages
+          $pkg = Get-AppxPackage -Name "com.younoter.younoter"
+          if (-not $pkg) { Write-Error "Package not found after installation"; exit 1 }
+          Write-Host "Installed successfully: $($pkg.PackageFullName)"
+
+          # Cleanup
+          Remove-AppxPackage -Package $pkg.PackageFullName
+          Write-Host "Test passed: MSIX installs and uninstalls correctly"
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msix
+          path: build\windows\x64\runner\Release\*.msix
+
       - name: Extract version from tag
+        if: startsWith(github.ref, 'refs/tags/')
         id: version
         shell: bash
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Package portable ZIP
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "YouNoter-${{ steps.version.outputs.tag }}-windows-portable.zip"
 
-      - name: Rename MSIX
+      - name: Rename MSIX for release
+        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         run: |
           $msix = Get-ChildItem -Path "build\windows\x64\runner\Release\" -Filter "*.msix" | Select-Object -First 1
           Copy-Item $msix.FullName "YouNoter-${{ steps.version.outputs.tag }}-windows-installer.msix"
 
-      - name: Upload artifacts
+      - name: Upload release artifacts
+        if: startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: windows-release
@@ -56,6 +105,7 @@ jobs:
             YouNoter-*.msix
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
