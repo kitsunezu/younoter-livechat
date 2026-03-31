@@ -63,4 +63,5 @@ msix_config:
   display_name: YouNoter
   publisher_display_name: YouNoter
   identity_name: com.younoter.younoter
-  msix_version: 1.0.0.0
+   msix_version: 1.0.0.0
+   install_certificate: false

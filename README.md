@@ -128,7 +128,7 @@ The app works without a key by scraping public chat data. To add a key for highe
 flutter build windows --release
 
 # Create MSIX installer
-dart run msix:create
+dart run msix:create --install-certificate false --build-windows false
 ```
 
 Outputs:
