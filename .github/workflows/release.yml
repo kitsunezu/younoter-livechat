@@ -33,48 +33,80 @@ jobs:
       - name: Build Windows release
         run: flutter build windows --release
 
-      - name: Create MSIX installer
-        run: dart run msix:create --install-certificate false --build-windows false
-
-      - name: Test MSIX installation
+      - name: Build MSI installer
         shell: pwsh
         run: |
-          # Enable sideloading (AllowAllTrustedApps)
-          $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
-          if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-          Set-ItemProperty -Path $regPath -Name "AllowAllTrustedApps" -Value 1 -Type DWord -Force
+          # Find WiX Toolset (pre-installed on windows-latest)
+          $wixDir = Get-ChildItem "C:\Program Files (x86)" -Filter "WiX Toolset*" -Directory |
+                    Sort-Object Name -Descending | Select-Object -First 1
+          if (-not $wixDir) { Write-Error "WiX Toolset not found"; exit 1 }
+          $wixBin = $wixDir.FullName + "\bin"
+          Write-Host "Using WiX: $wixBin"
+          $env:PATH = "$wixBin;$env:PATH"
 
-          # Find the generated MSIX
-          $msix = Get-ChildItem "build\windows\x64\runner\Release\" -Filter "*.msix" | Select-Object -First 1
-          if (-not $msix) { Write-Error "MSIX not found in output directory"; exit 1 }
-          Write-Host "Found MSIX: $($msix.Name)"
+          New-Item -ItemType Directory -Force -Path installer\obj | Out-Null
+          $buildDir = (Resolve-Path "build\windows\x64\runner\Release").Path
 
-          # Extract the signing certificate from the MSIX
-          $sig = Get-AuthenticodeSignature -FilePath $msix.FullName
-          if (-not $sig.SignerCertificate) { Write-Error "MSIX is not signed"; exit 1 }
-          $sig.SignerCertificate | Export-Certificate -FilePath "signer.cer" -Type CERT | Out-Null
-          Import-Certificate -FilePath "signer.cer" -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
-          Import-Certificate -FilePath "signer.cer" -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
-          Write-Host "Trusted certificate: $($sig.SignerCertificate.Subject)"
+          # Read version from pubspec.yaml
+          $content = Get-Content pubspec.yaml -Raw
+          $version = if ($content -match "version:\s*(\d+\.\d+\.\d+)") { "$($Matches[1]).0" } else { "1.0.0.0" }
+          Write-Host "Building MSI version: $version"
 
-          # Install the MSIX
-          Add-AppPackage -Path $msix.FullName
-          Start-Sleep -Seconds 2
+          # Harvest all files from the Flutter build output
+          heat.exe dir $buildDir -gg -scom -sreg -sfrag -srd `
+            -dr INSTALLFOLDER -cg ProductComponents `
+            -var var.SourceDir -out installer\obj\components.wxs
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-          # Verify the package appears in installed packages
-          $pkg = Get-AppxPackage -Name "com.younoter.younoter"
-          if (-not $pkg) { Write-Error "Package not found after installation"; exit 1 }
-          Write-Host "Installed successfully: $($pkg.PackageFullName)"
+          # Compile both wxs files
+          candle.exe -dVersion="$version" -dSourceDir="$buildDir" `
+            installer\installer.wxs installer\obj\components.wxs `
+            -arch x64 -out installer\obj\
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-          # Cleanup
-          Remove-AppxPackage -Package $pkg.PackageFullName
-          Write-Host "Test passed: MSIX installs and uninstalls correctly"
+          # Link into MSI
+          light.exe installer\obj\installer.wixobj installer\obj\components.wixobj `
+            -out YouNoter-installer.msi -ext WixUIExtension
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Upload MSIX artifact
+          Write-Host "MSI created: YouNoter-installer.msi"
+
+      - name: Test MSI installation
+        shell: pwsh
+        run: |
+          $msi = (Resolve-Path "YouNoter-installer.msi").Path
+          Write-Host "Testing: $msi"
+
+          # Install silently with log
+          $proc = Start-Process msiexec.exe `
+            -ArgumentList "/i `"$msi`" /qn /l*v install.log" `
+            -Wait -PassThru
+          if ($proc.ExitCode -ne 0) {
+            Get-Content install.log -Tail 30
+            Write-Error "MSI installation failed (exit $($proc.ExitCode))"
+            exit 1
+          }
+
+          # Verify in Uninstall registry (x64 perMachine)
+          $installed = Get-ItemProperty `
+            "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" `
+            -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -eq "YouNoter" }
+          if (-not $installed) { Write-Error "YouNoter not found in installed programs"; exit 1 }
+          Write-Host "Verified: $($installed.DisplayName) v$($installed.DisplayVersion)"
+
+          # Uninstall
+          $proc = Start-Process msiexec.exe `
+            -ArgumentList "/x `"$msi`" /qn" `
+            -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { Write-Error "Uninstall failed (exit $($proc.ExitCode))"; exit 1 }
+          Write-Host "Test passed: MSI installs and uninstalls correctly"
+
+      - name: Upload MSI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-msix
-          path: build\windows\x64\runner\Release\*.msix
+          name: windows-msi
+          path: YouNoter-installer.msi
 
       - name: Extract version from tag
         if: startsWith(github.ref, 'refs/tags/')
@@ -93,7 +125,11 @@ jobs:
         shell: pwsh
         run: |
           $msix = Get-ChildItem -Path "build\windows\x64\runner\Release\" -Filter "*.msix" | Select-Object -First 1
-          Copy-Item $msix.FullName "YouNoter-${{ steps.version.outputs.tag }}-windows-installer.msix"
+      - name: Rename MSI for release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          Copy-Item "YouNoter-installer.msi" "YouNoter-${{ steps.version.outputs.tag }}-windows-installer.msi"
 
       - name: Upload release artifacts
         if: startsWith(github.ref, 'refs/tags/')
@@ -102,7 +138,7 @@ jobs:
           name: windows-release
           path: |
             YouNoter-*.zip
-            YouNoter-*.msix
+            YouNoter-*-windows-installer.msi
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -111,4 +147,4 @@ jobs:
           generate_release_notes: true
           files: |
             YouNoter-*.zip
-            YouNoter-*.msix
+            YouNoter-*-windows-installer.msi

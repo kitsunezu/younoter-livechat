@@ -50,7 +50,6 @@ dev_dependencies:
   drift_dev: ^2.22.1
   build_runner: ^2.4.14
   riverpod_generator: ^2.6.3
-  msix: ^3.16.8
 
 flutter:
   uses-material-design: true
@@ -59,10 +58,4 @@ flutter:
   assets:
     - assets/
 
-msix_config:
-  display_name: YouNoter
-  publisher_display_name: YouNoter
-  identity_name: com.younoter.younoter
-  msix_version: 1.0.3.0
-  install_certificate: false
-  logo_path: assets/yonoter-logo.png
+
