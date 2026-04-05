@@ -27,6 +27,7 @@ class LiveChatManager {
   final ChatMode mode;
 
   Timer? _pollTimer;
+  Timer? _viewerCountTimer;
   String? _liveChatId;
   String? _videoId;
   String? _nextPageToken;
@@ -35,6 +36,14 @@ class LiveChatManager {
   String? _currentStreamTitle;
   bool _useScrapeFallback = false;
   UsernameResolver? _usernameResolver;
+
+  int? _currentViewers;
+  int? _peakViewers;
+  int? get currentViewers => _currentViewers;
+  int? get peakViewers => _peakViewers;
+
+  final _viewersController = StreamController<int?>.broadcast();
+  Stream<int?> get peakViewersStream => _viewersController.stream;
 
   /// Whether the current session is loading archived chat replay.
   bool get isReplay =>
@@ -131,6 +140,8 @@ class LiveChatManager {
   void disconnect() {
     _pollTimer?.cancel();
     _pollTimer = null;
+    _viewerCountTimer?.cancel();
+    _viewerCountTimer = null;
     _nextPageToken = null;
     _liveChatId = null;
     _videoId = null;
@@ -138,6 +149,8 @@ class LiveChatManager {
     _currentOwnerChannelName = null;
     _currentStreamTitle = null;
     _useScrapeFallback = false;
+    _currentViewers = null;
+    _peakViewers = null;
     _usernameResolver?.stop();
     _usernameResolver = null;
     _setStatus(ChatConnectionStatus.disconnected);
@@ -150,6 +163,34 @@ class LiveChatManager {
 
   void _startPolling() {
     _poll(); // initial poll immediately
+    _fetchViewerCount(); // initial fetch immediately
+    // Re-fetch viewer count every 60 seconds.
+    _viewerCountTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _fetchViewerCount(),
+    );
+  }
+
+  Future<void> _fetchViewerCount() async {
+    final vid = _videoId;
+    if (vid == null || _status != ChatConnectionStatus.connected) return;
+    try {
+      int? count;
+      if (mode == ChatMode.api && _api != null && !_useScrapeFallback) {
+        count = await _api.getConcurrentViewers(vid);
+      } else {
+        count = await _scrape.getConcurrentViewers(vid);
+      }
+      if (count != null && count > 0) {
+        _currentViewers = count;
+        if (_peakViewers == null || count > _peakViewers!) {
+          _peakViewers = count;
+          _viewersController.add(_peakViewers);
+        }
+      }
+    } catch (_) {
+      // Silently ignore — viewer count is best-effort.
+    }
   }
 
   Future<void> _poll() async {
@@ -290,5 +331,6 @@ class LiveChatManager {
     _usernameResolver?.dispose();
     _statusController.close();
     _messageController.close();
+    _viewersController.close();
   }
 }

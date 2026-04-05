@@ -345,4 +345,13 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get fontLarge => 'Grand';
+
+  @override
+  String get highlightViewer => 'Surligner';
+
+  @override
+  String get removeHighlight => 'Retirer le surlignage';
+
+  @override
+  String get peakViewers => 'Pic de spectateurs';
 }

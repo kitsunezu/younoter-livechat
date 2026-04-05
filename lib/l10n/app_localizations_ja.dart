@@ -341,4 +341,13 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get fontLarge => '大';
+
+  @override
+  String get highlightViewer => 'ハイライト';
+
+  @override
+  String get removeHighlight => 'ハイライト解除';
+
+  @override
+  String get peakViewers => '最大同時視聴者数';
 }

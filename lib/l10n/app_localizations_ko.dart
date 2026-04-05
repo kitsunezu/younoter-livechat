@@ -342,4 +342,13 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get fontLarge => '크게';
+
+  @override
+  String get highlightViewer => '하이라이트';
+
+  @override
+  String get removeHighlight => '하이라이트 해제';
+
+  @override
+  String get peakViewers => '최대 동시 시청자';
 }

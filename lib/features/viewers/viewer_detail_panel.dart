@@ -144,6 +144,37 @@ class _ViewerDetailPanelState extends ConsumerState<ViewerDetailPanel> {
                       );
                     },
                   ),
+                  // Highlight toggle
+                  Consumer(builder: (context, ref, _) {
+                    final highlighted =
+                        ref.watch(highlightedViewersProvider);
+                    final isHighlighted =
+                        highlighted.contains(viewer.channelId);
+                    return IconButton(
+                      icon: Icon(
+                        isHighlighted
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        color: Colors.amber.shade600,
+                      ),
+                      tooltip: isHighlighted
+                          ? l.removeHighlight
+                          : l.highlightViewer,
+                      onPressed: () {
+                        ref
+                            .read(highlightedViewersProvider.notifier)
+                            .update((s) {
+                          final updated = Set<String>.from(s);
+                          if (updated.contains(viewer.channelId)) {
+                            updated.remove(viewer.channelId);
+                          } else {
+                            updated.add(viewer.channelId);
+                          }
+                          return updated;
+                        });
+                      },
+                    );
+                  }),
                   IconButton(
                     icon: Icon(Icons.delete_outline,
                         color: colorScheme.error),

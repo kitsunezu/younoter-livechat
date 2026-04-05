@@ -122,5 +122,8 @@
   "chatFontSize": "聊天室字體大小",
   "fontSmall": "小",
   "fontMedium": "中",
-  "fontLarge": "大"
+  "fontLarge": "大",
+  "highlightViewer": "標記",
+  "removeHighlight": "取消標記",
+  "peakViewers": "最高同時人數"
 }

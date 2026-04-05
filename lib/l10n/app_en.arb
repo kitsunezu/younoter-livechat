@@ -122,5 +122,8 @@
   "chatFontSize": "Chat Font Size",
   "fontSmall": "Small",
   "fontMedium": "Medium",
-  "fontLarge": "Large"
+  "fontLarge": "Large",
+  "highlightViewer": "Highlight",
+  "removeHighlight": "Remove Highlight",
+  "peakViewers": "Peak Viewers"
 }

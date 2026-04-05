@@ -344,4 +344,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get fontLarge => 'Groß';
+
+  @override
+  String get highlightViewer => 'Markieren';
+
+  @override
+  String get removeHighlight => 'Markierung entfernen';
+
+  @override
+  String get peakViewers => 'Spitzenzuschauer';
 }

@@ -818,6 +818,53 @@ class YouTubeScrapeService {
     }
   }
 
+  /// Fetches the current concurrent viewer count via the innertube
+  /// `updated_metadata` endpoint.  Uses the API key / client version already
+  /// captured during [initLiveChat].  Returns null when unavailable.
+  Future<int?> getConcurrentViewers(String videoId) async {
+    final apiKey = _apiKey;
+    final clientVersion = _clientVersion ?? '2.20240101.00.00';
+    final url = apiKey != null
+        ? 'https://www.youtube.com/youtubei/v1/updated_metadata?key=$apiKey&prettyPrint=false'
+        : 'https://www.youtube.com/youtubei/v1/updated_metadata?prettyPrint=false';
+    try {
+      final response = await _client.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                  '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        body: jsonEncode({
+          'context': {
+            'client': {
+              'clientName': 'WEB',
+              'clientVersion': clientVersion,
+            },
+          },
+          'videoId': videoId,
+        }),
+      );
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final actions = data['actions'] as List?;
+      if (actions == null) return null;
+      for (final action in actions) {
+        final vcAction =
+            (action as Map<String, dynamic>)['updateViewershipAction'];
+        if (vcAction == null) continue;
+        final raw = vcAction['viewCount']?['videoViewCountRenderer']
+            ?['originalViewCount'];
+        if (raw != null) return int.tryParse(raw.toString());
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   void dispose() {
     _client.close();
   }

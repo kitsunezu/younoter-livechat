@@ -122,5 +122,8 @@
   "chatFontSize": "チャット文字サイズ",
   "fontSmall": "小",
   "fontMedium": "中",
-  "fontLarge": "大"
+  "fontLarge": "大",
+  "highlightViewer": "ハイライト",
+  "removeHighlight": "ハイライト解除",
+  "peakViewers": "最大同時視聴者数"
 }

@@ -292,6 +292,8 @@ class _ChatMessageList extends ConsumerWidget {
     final theme = Theme.of(context);
     final l = AppLocalizations.of(context)!;
 
+    final highlighted = ref.watch(highlightedViewersProvider);
+
     return messagesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
@@ -325,11 +327,23 @@ class _ChatMessageList extends ConsumerWidget {
               displayNameMode: mode,
               chatFontSize: fontSize,
               isSuperChat: isSuperChat,
+              isHighlighted: highlighted.contains(msg.channelId),
               onTapViewer: () {
                 ref.read(selectedOwnerChannelIdProvider.notifier).state =
                   ownerChannelId;
                 ref.read(selectedViewerIdProvider.notifier).state =
                     msg.channelId;
+              },
+              onToggleHighlight: () {
+                ref.read(highlightedViewersProvider.notifier).update((s) {
+                  final updated = Set<String>.from(s);
+                  if (updated.contains(msg.channelId)) {
+                    updated.remove(msg.channelId);
+                  } else {
+                    updated.add(msg.channelId);
+                  }
+                  return updated;
+                });
               },
             );
           },
@@ -348,7 +362,9 @@ class _ChatMessageTile extends StatelessWidget {
   final DisplayNameMode displayNameMode;
   final ChatFontSize chatFontSize;
   final bool isSuperChat;
+  final bool isHighlighted;
   final VoidCallback onTapViewer;
+  final VoidCallback onToggleHighlight;
 
   const _ChatMessageTile({
     required this.message,
@@ -359,7 +375,9 @@ class _ChatMessageTile extends StatelessWidget {
     required this.displayNameMode,
     required this.chatFontSize,
     required this.isSuperChat,
+    required this.isHighlighted,
     required this.onTapViewer,
+    required this.onToggleHighlight,
   });
 
   @override
@@ -414,7 +432,9 @@ class _ChatMessageTile extends StatelessWidget {
             isSticker: message.type == 'superStickerEvent')
         : null;
 
-    return Container(
+    return GestureDetector(
+      onSecondaryTapUp: (details) => _showContextMenu(context, details.globalPosition),
+      child: Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: isSuperChat
@@ -422,16 +442,29 @@ class _ChatMessageTile extends StatelessWidget {
               color: scBg ?? Colors.amber.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color: scBorder ?? Colors.amber.withValues(alpha: 0.4)),
+                  color: isHighlighted
+                      ? Colors.amber.shade600
+                      : scBorder ?? Colors.amber.withValues(alpha: 0.4),
+                  width: isHighlighted ? 1.8 : 1.0),
             )
           : isMembershipEvent
               ? BoxDecoration(
                   color: Colors.green.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border:
-                      Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                  border: Border.all(
+                      color: isHighlighted
+                          ? Colors.amber.shade600
+                          : Colors.green.withValues(alpha: 0.4),
+                      width: isHighlighted ? 1.8 : 1.0),
                 )
-              : null,
+              : isHighlighted
+                  ? BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: Colors.amber.shade600, width: 1.5),
+                    )
+                  : null,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -443,6 +476,12 @@ class _ChatMessageTile extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (isHighlighted)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Icon(Icons.star_rounded,
+                          size: 13, color: Colors.amber.shade600),
+                    ),
                   if (isFirstTime)
                     Container(
                       margin: const EdgeInsets.only(right: 4),
@@ -538,7 +577,51 @@ class _ChatMessageTile extends StatelessWidget {
           ),
         ],
       ),
+      ),
     );
+  }
+
+  void _showContextMenu(BuildContext context, Offset globalPosition) {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final l = AppLocalizations.of(context)!;
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        PopupMenuItem<String>(
+          value: 'details',
+          child: Row(
+            children: [
+              const Icon(Icons.person_outline, size: 18),
+              const SizedBox(width: 8),
+              Text(l.viewerDetails),
+            ],
+          ),
+        ),
+        PopupMenuItem<String>(
+          value: 'highlight',
+          child: Row(
+            children: [
+              Icon(
+                isHighlighted ? Icons.star_rounded : Icons.star_border_rounded,
+                size: 18,
+                color: Colors.amber.shade600,
+              ),
+              const SizedBox(width: 8),
+              Text(isHighlighted ? l.removeHighlight : l.highlightViewer),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'details') onTapViewer();
+      if (value == 'highlight') onToggleHighlight();
+    });
   }
 
   String _formatTime(DateTime dt) {

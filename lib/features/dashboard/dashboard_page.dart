@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../l10n/app_localizations.dart';
 
 import '../../core/database/database.dart';
@@ -55,42 +56,10 @@ class DashboardPage extends ConsumerWidget {
           const SizedBox(height: 12),
           _TopDonorsSection(liveChatId: liveChatId),
           const SizedBox(height: 24),
-          // Super Chat distribution (by donor) + currency breakdown side by side
+          // Super Chat distribution charts — side by side on desktop, stacked on mobile
           Text(l.superChatDistribution, style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 300,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(l.topDonors,
-                          style: Theme.of(context).textTheme.labelMedium),
-                      const SizedBox(height: 6),
-                      Expanded(
-                          child: _SuperChatChart(liveChatId: liveChatId)),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(l.currencyDistribution,
-                          style: Theme.of(context).textTheme.labelMedium),
-                      const SizedBox(height: 6),
-                      Expanded(
-                          child: _CurrencyPieChart(liveChatId: liveChatId)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _ChartsSection(liveChatId: liveChatId),
         ],
       ),
     );
@@ -116,9 +85,20 @@ class _StreamInfoHeader extends StatelessWidget {
     final thumbUrl = videoId != null
         ? 'https://i.ytimg.com/vi/$videoId/mqdefault.jpg'
         : null;
+    final streamUrl = videoId != null
+        ? Uri.parse('https://www.youtube.com/watch?v=$videoId')
+        : null;
 
-    return Card(
-      child: Padding(
+    Widget card = Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: streamUrl != null
+            ? () => launchUrl(streamUrl, mode: LaunchMode.externalApplication)
+            : null,
+        mouseCursor: streamUrl != null
+            ? SystemMouseCursors.click
+            : MouseCursor.defer,
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
@@ -179,13 +159,33 @@ class _StreamInfoHeader extends StatelessWidget {
                       ],
                     ),
                   ],
+                  if (streamUrl != null) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.open_in_new,
+                            size: 14, color: colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Text(
+                          'youtube.com/watch?v=$videoId',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.primary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
           ],
         ),
       ),
+      ),
     );
+
+    return card;
   }
 }
 
@@ -204,6 +204,10 @@ class _StatsCardsRow extends ConsumerWidget {
     final newMemberCount = ref.watch(newMemberCountProvider(liveChatId));
     final giftedCount = ref.watch(giftedMembershipCountProvider(liveChatId));
     final milestoneCount = ref.watch(milestoneCountProvider(liveChatId));
+    final manager = ref.watch(liveChatManagerProvider);
+    // Watch peakViewersProvider to rebuild when peak updates.
+    ref.watch(peakViewersProvider);
+    final peakViewers = manager.peakViewers;
     final l = AppLocalizations.of(context)!;
 
     final normalizedTotal = superChatsAsync.when(
@@ -216,10 +220,19 @@ class _StatsCardsRow extends ConsumerWidget {
       error: (_, __) => -1.0,
     );
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth < 600
+            ? 2
+            : (constraints.maxWidth / 200).floor().clamp(2, 8);
+        return GridView.count(
+          crossAxisCount: crossAxisCount,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 1.55,
+          children: [
         _StatCard(
           icon: Icons.chat_bubble_outline,
           label: l.totalMessages,
@@ -288,7 +301,17 @@ class _StatsCardsRow extends ConsumerWidget {
           ),
           color: Colors.teal,
         ),
+        _StatCard(
+          icon: Icons.visibility_outlined,
+          label: l.peakViewers,
+          value: peakViewers != null
+              ? peakViewers.toString()
+              : l.counting,
+          color: Colors.deepOrange,
+        ),
       ],
+        );
+      },
     );
   }
 }
@@ -309,31 +332,33 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SizedBox(
-      width: 180,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color, size: 28),
-              const SizedBox(height: 8),
-              Text(
-                value,
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 26),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-            ],
-          ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
@@ -363,8 +388,79 @@ class _NormalizedDonor {
   }
 }
 
+/// Two pie charts: side by side on desktop (≥600), stacked on mobile (<600).
+class _ChartsSection extends StatelessWidget {
+  final String liveChatId;
+  const _ChartsSection({required this.liveChatId});
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context)!;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        if (isMobile) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l.topDonors,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 280,
+                child: _SuperChatChart(liveChatId: liveChatId),
+              ),
+              const SizedBox(height: 16),
+              Text(l.currencyDistribution,
+                  style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 280,
+                child: _CurrencyPieChart(liveChatId: liveChatId),
+              ),
+            ],
+          );
+        }
+        return SizedBox(
+          height: 300,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.topDonors,
+                        style: Theme.of(context).textTheme.labelMedium),
+                    const SizedBox(height: 6),
+                    Expanded(
+                        child: _SuperChatChart(liveChatId: liveChatId)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.currencyDistribution,
+                        style: Theme.of(context).textTheme.labelMedium),
+                    const SizedBox(height: 6),
+                    Expanded(
+                        child: _CurrencyPieChart(liveChatId: liveChatId)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 List<_NormalizedDonor> _computeTopDonors(List<SuperChat> superChats,
-    {int limit = 10}) {
+    {int? limit}) {
   final map = <String, _NormalizedDonor>{};
   for (final sc in superChats) {
     final usd = normalizeToUsd(sc.currency, sc.amountMicros);
@@ -396,7 +492,7 @@ List<_NormalizedDonor> _computeTopDonors(List<SuperChat> superChats,
   }
   final sorted = map.values.toList()
     ..sort((a, b) => b.totalUsd.compareTo(a.totalUsd));
-  return sorted.take(limit).toList();
+  return limit != null ? sorted.take(limit).toList() : sorted;
 }
 
 void _openViewerSheet(BuildContext ctx, String channelId) {
@@ -439,31 +535,42 @@ class _TopDonorsSection extends ConsumerWidget {
         if (donors.isEmpty) {
           return Text(AppLocalizations.of(context)!.noSuperChatDonors);
         }
-        return ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 480),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: donors.length,
-            itemBuilder: (context, i) {
-              final donor = donors[i];
-              final viewer = viewersMap[donor.channelId];
-              final resolvedName = (viewer?.username?.isNotEmpty ?? false)
-                  ? viewer!.username!
-                  : donor.displayName;
-              return ListTile(
-                dense: true,
-                leading: CircleAvatar(
-                  radius: 16,
-                  child: Text('${i + 1}'),
-                ),
-                title: Text(resolvedName),
-                trailing: Text(
-                  donor.originalSummary,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onTap: () => _openViewerSheet(context, donor.channelId),
-              );
-            },
+        // Each dense ListTile is ~48px; show max 5 items then scroll.
+        const itemHeight = 48.0;
+        const maxVisible = 5;
+        final constrainedHeight = donors.length > maxVisible
+            ? itemHeight * maxVisible
+            : itemHeight * donors.length;
+        final scrollController = ScrollController();
+        return SizedBox(
+          height: constrainedHeight,
+          child: Scrollbar(
+            controller: scrollController,
+            thumbVisibility: donors.length > maxVisible,
+            child: ListView.builder(
+              controller: scrollController,
+              itemCount: donors.length,
+              itemBuilder: (context, i) {
+                final donor = donors[i];
+                final viewer = viewersMap[donor.channelId];
+                final resolvedName = (viewer?.username?.isNotEmpty ?? false)
+                    ? viewer!.username!
+                    : donor.displayName;
+                return ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 16,
+                    child: Text('${i + 1}'),
+                  ),
+                  title: Text(resolvedName),
+                  trailing: Text(
+                    donor.originalSummary,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  onTap: () => _openViewerSheet(context, donor.channelId),
+                );
+              },
+            ),
           ),
         );
       },

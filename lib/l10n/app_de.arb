@@ -122,5 +122,8 @@
   "chatFontSize": "Chat-Schriftgröße",
   "fontSmall": "Klein",
   "fontMedium": "Mittel",
-  "fontLarge": "Groß"
+  "fontLarge": "Groß",
+  "highlightViewer": "Markieren",
+  "removeHighlight": "Markierung entfernen",
+  "peakViewers": "Spitzenzuschauer"
 }

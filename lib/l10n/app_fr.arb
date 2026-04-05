@@ -122,5 +122,8 @@
   "chatFontSize": "Taille de police du chat",
   "fontSmall": "Petit",
   "fontMedium": "Moyen",
-  "fontLarge": "Grand"
+  "fontLarge": "Grand",
+  "highlightViewer": "Surligner",
+  "removeHighlight": "Retirer le surlignage",
+  "peakViewers": "Pic de spectateurs"
 }

@@ -260,3 +260,13 @@ enum ChatFontSize { small, medium, large }
 
 final chatFontSizeProvider =
     StateProvider<ChatFontSize>((ref) => SettingsService.chatFontSize);
+
+/// Highlighted viewer channelIds — persists for the duration of the session.
+final highlightedViewersProvider =
+    StateProvider<Set<String>>((ref) => {});
+
+/// Peak concurrent viewers stream for the current live session.
+final peakViewersProvider = StreamProvider<int?>((ref) {
+  final manager = ref.watch(liveChatManagerProvider);
+  return manager.peakViewersStream;
+});

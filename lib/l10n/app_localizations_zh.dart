@@ -340,4 +340,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fontLarge => '大';
+
+  @override
+  String get highlightViewer => '標記';
+
+  @override
+  String get removeHighlight => '取消標記';
+
+  @override
+  String get peakViewers => '最高同時人數';
 }

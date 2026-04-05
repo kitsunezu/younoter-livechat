@@ -122,5 +122,8 @@
   "chatFontSize": "채팅 글꼴 크기",
   "fontSmall": "작게",
   "fontMedium": "보통",
-  "fontLarge": "크게"
+  "fontLarge": "크게",
+  "highlightViewer": "하이라이트",
+  "removeHighlight": "하이라이트 해제",
+  "peakViewers": "최대 동시 시청자"
 }

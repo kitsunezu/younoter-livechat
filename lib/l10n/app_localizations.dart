@@ -757,6 +757,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Large'**
   String get fontLarge;
+
+  /// No description provided for @highlightViewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlight'**
+  String get highlightViewer;
+
+  /// No description provided for @removeHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Highlight'**
+  String get removeHighlight;
+
+  /// No description provided for @peakViewers.
+  ///
+  /// In en, this message translates to:
+  /// **'Peak Viewers'**
+  String get peakViewers;
 }
 
 class _AppLocalizationsDelegate
