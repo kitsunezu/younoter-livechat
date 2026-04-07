@@ -93,6 +93,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get topDonors => 'Top Donors';
 
   @override
+  String get top5Donors => 'Top 5 Donors';
+
+  @override
   String get activeViewers => 'Active Viewers';
 
   @override

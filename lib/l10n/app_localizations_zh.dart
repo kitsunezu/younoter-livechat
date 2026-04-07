@@ -93,6 +93,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get topDonors => 'Top 捐贈者';
 
   @override
+  String get top5Donors => 'Top5 捐贈者';
+
+  @override
   String get activeViewers => '活躍觀眾';
 
   @override

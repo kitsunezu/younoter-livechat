@@ -278,6 +278,12 @@ abstract class AppLocalizations {
   /// **'Top Donors'**
   String get topDonors;
 
+  /// No description provided for @top5Donors.
+  ///
+  /// In en, this message translates to:
+  /// **'Top 5 Donors'**
+  String get top5Donors;
+
   /// No description provided for @activeViewers.
   ///
   /// In en, this message translates to:

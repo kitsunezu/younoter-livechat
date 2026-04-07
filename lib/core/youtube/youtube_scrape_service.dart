@@ -855,8 +855,15 @@ class YouTubeScrapeService {
         final vcAction =
             (action as Map<String, dynamic>)['updateViewershipAction'];
         if (vcAction == null) continue;
-        final raw = vcAction['viewCount']?['videoViewCountRenderer']
-            ?['originalViewCount'];
+        final renderer =
+            vcAction['viewCount']?['videoViewCountRenderer'] as Map?;
+        if (renderer == null) continue;
+        // isLive is only present (and true) while the stream is live.
+        // After the stream ends, originalViewCount becomes the total view
+        // count rather than concurrent viewers, so we must skip it.
+        final isLive = renderer['isLive'] as bool? ?? false;
+        if (!isLive) continue;
+        final raw = renderer['originalViewCount'];
         if (raw != null) return int.tryParse(raw.toString());
       }
       return null;

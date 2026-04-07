@@ -93,6 +93,9 @@ class AppLocalizationsJa extends AppLocalizations {
   String get topDonors => 'トップドナー';
 
   @override
+  String get top5Donors => 'トップ5ドナー';
+
+  @override
   String get activeViewers => 'アクティブ視聴者';
 
   @override

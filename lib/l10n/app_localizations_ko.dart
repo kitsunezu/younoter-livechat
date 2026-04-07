@@ -93,6 +93,9 @@ class AppLocalizationsKo extends AppLocalizations {
   String get topDonors => '상위 후원자';
 
   @override
+  String get top5Donors => 'Top 5 후원자';
+
+  @override
   String get activeViewers => '활성 시청자';
 
   @override

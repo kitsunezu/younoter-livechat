@@ -430,7 +430,7 @@ class _ChartsSection extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l.topDonors,
+                    Text(l.top5Donors,
                         style: Theme.of(context).textTheme.labelMedium),
                     const SizedBox(height: 6),
                     Expanded(
