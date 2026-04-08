@@ -174,6 +174,9 @@ class LiveChatManager {
   Future<void> _fetchViewerCount() async {
     final vid = _videoId;
     if (vid == null || _status != ChatConnectionStatus.connected) return;
+    // Replays/VODs don't have concurrent viewers — the API returns total
+    // view count instead.  Skip entirely to avoid corrupting peak data.
+    if (isReplay) return;
     try {
       int? count;
       if (mode == ChatMode.api && _api != null && !_useScrapeFallback) {
@@ -219,7 +222,10 @@ class LiveChatManager {
       }
 
       // Replay finished — all archived messages have been loaded.
+      // Also stop the viewer count timer so it doesn't keep running.
       if (result.isFinished) {
+        _viewerCountTimer?.cancel();
+        _viewerCountTimer = null;
         return;
       }
 
