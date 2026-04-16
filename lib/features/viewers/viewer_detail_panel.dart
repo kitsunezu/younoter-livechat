@@ -25,6 +25,7 @@ class _ViewerDetailPanelState extends ConsumerState<ViewerDetailPanel> {
   late final ScrollController _scrollCtrl;
   bool _ownScrollCtrl = false;
   bool _showTopButton = false;
+  String _selectedOwnerChannelId = '';
 
   @override
   void initState() {
@@ -68,8 +69,7 @@ class _ViewerDetailPanelState extends ConsumerState<ViewerDetailPanel> {
   @override
   Widget build(BuildContext context) {
     final viewerAsync = ref.watch(viewerProvider(widget.channelId));
-    final ownerChannelsAsync = ref.watch(ownerChannelsProvider);
-    final selectedOwnerChannelId = ref.watch(selectedOwnerChannelIdProvider);
+    final ownerChannelsAsync = ref.watch(viewerOwnerChannelsProvider(widget.channelId));
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -252,12 +252,13 @@ class _ViewerDetailPanelState extends ConsumerState<ViewerDetailPanel> {
                 loading: () => const SizedBox.shrink(),
                 error: (_, __) => const SizedBox.shrink(),
                 data: (channels) => DropdownMenu<String>(
-                  initialSelection: selectedOwnerChannelId,
+                  initialSelection: _selectedOwnerChannelId,
                   width: 320,
                   label: Text(l.broadcasterChannel),
                   onSelected: (value) {
-                    ref.read(selectedOwnerChannelIdProvider.notifier).state =
-                        value ?? '';
+                    setState(() {
+                      _selectedOwnerChannelId = value ?? '';
+                    });
                   },
                   dropdownMenuEntries: [
                     DropdownMenuEntry(value: '', label: l.allChannels),
@@ -293,11 +294,17 @@ class _ViewerDetailPanelState extends ConsumerState<ViewerDetailPanel> {
 
               // Super Chat history
               const SizedBox(height: 16),
-              _ViewerSuperChatSection(channelId: widget.channelId),
+              _ViewerSuperChatSection(
+                channelId: widget.channelId,
+                ownerChannelId: _selectedOwnerChannelId,
+              ),
 
               // Chat history
               const SizedBox(height: 16),
-              _ViewerChatSection(channelId: widget.channelId),
+              _ViewerChatSection(
+                channelId: widget.channelId,
+                ownerChannelId: _selectedOwnerChannelId,
+              ),
             ],
           ),
             ),
@@ -366,14 +373,18 @@ class _InfoRow extends StatelessWidget {
 /// Shows this viewer's Super Chat history.
 class _ViewerSuperChatSection extends ConsumerWidget {
   final String channelId;
-  const _ViewerSuperChatSection({required this.channelId});
+  final String ownerChannelId;
+  const _ViewerSuperChatSection({
+    required this.channelId,
+    required this.ownerChannelId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l = AppLocalizations.of(context)!;
-    final scAsync = ref.watch(viewerSuperChatsProvider(channelId));
+    final scAsync = ref.watch(viewerSuperChatsProvider((channelId, ownerChannelId)));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -454,14 +465,18 @@ class _ViewerSuperChatSection extends ConsumerWidget {
 /// Shows this viewer's chat message history.
 class _ViewerChatSection extends ConsumerWidget {
   final String channelId;
-  const _ViewerChatSection({required this.channelId});
+  final String ownerChannelId;
+  const _ViewerChatSection({
+    required this.channelId,
+    required this.ownerChannelId,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l = AppLocalizations.of(context)!;
-    final msgsAsync = ref.watch(viewerMessagesProvider(channelId));
+    final msgsAsync = ref.watch(viewerMessagesProvider((channelId, ownerChannelId)));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

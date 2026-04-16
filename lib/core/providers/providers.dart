@@ -77,26 +77,35 @@ final viewerProvider = StreamProvider.family<Viewer?, String>((ref, channelId) {
 
 final selectedOwnerChannelIdProvider = StateProvider<String>((ref) => '');
 
-/// A viewer's chat messages (across all streams).
+/// A viewer's chat messages filtered by owner channel.
+/// Param: (viewerChannelId, ownerChannelId) — ownerChannelId may be empty.
 final viewerMessagesProvider =
-    StreamProvider.family<List<ChatMessage>, String>((ref, channelId) {
+    StreamProvider.family<List<ChatMessage>, (String, String)>((ref, params) {
+  final (channelId, ownerChannelId) = params;
   final db = ref.read(databaseProvider);
-  final ownerChannelId = ref.watch(selectedOwnerChannelIdProvider);
   return db.chatMessageDao.watchViewerMessages(
     channelId,
     ownerChannelId: ownerChannelId,
   );
 });
 
-/// A viewer's super chats (across all streams).
+/// A viewer's super chats filtered by owner channel.
+/// Param: (viewerChannelId, ownerChannelId) — ownerChannelId may be empty.
 final viewerSuperChatsProvider =
-    StreamProvider.family<List<SuperChat>, String>((ref, channelId) {
+    StreamProvider.family<List<SuperChat>, (String, String)>((ref, params) {
+  final (channelId, ownerChannelId) = params;
   final db = ref.read(databaseProvider);
-  final ownerChannelId = ref.watch(selectedOwnerChannelIdProvider);
   return db.superChatDao.watchViewerSuperChats(
     channelId,
     ownerChannelId: ownerChannelId,
   );
+});
+
+/// Owner channels where a specific viewer has commented.
+final viewerOwnerChannelsProvider =
+    StreamProvider.family<List<OwnerChannelSummary>, String>((ref, viewerChannelId) {
+  final db = ref.read(databaseProvider);
+  return db.liveStreamDao.watchOwnerChannelsByViewer(viewerChannelId);
 });
 
 /// Viewer search query.

@@ -277,12 +277,18 @@ class ChatMessageDao extends DatabaseAccessor<AppDatabase>
         .get();
   }
 
-  /// Returns the set of channelIds that have exactly 1 message in this liveChatId.
+  /// Returns the set of channelIds that appear in this liveChatId but have
+  /// never appeared in any other live chat — i.e. genuine first-time viewers.
   Stream<Set<String>> watchFirstTimeViewers(String liveChatId) {
     final query = customSelect(
-      'SELECT channel_id FROM chat_messages WHERE live_chat_id = ? '
-      'GROUP BY channel_id HAVING COUNT(*) = 1',
-      variables: [Variable.withString(liveChatId)],
+      'SELECT DISTINCT channel_id FROM chat_messages WHERE live_chat_id = ? '
+      'AND channel_id NOT IN ('
+      '  SELECT DISTINCT channel_id FROM chat_messages WHERE live_chat_id != ?'
+      ')',
+      variables: [
+        Variable.withString(liveChatId),
+        Variable.withString(liveChatId),
+      ],
       readsFrom: {chatMessages},
     );
     return query.watch().map(
@@ -509,6 +515,30 @@ class LiveStreamDao extends DatabaseAccessor<AppDatabase>
 
   Future<void> clearHistory() {
     return delete(liveStreams).go();
+  }
+
+  /// Watch owner channels where a specific viewer has left messages.
+  Stream<List<OwnerChannelSummary>> watchOwnerChannelsByViewer(
+      String viewerChannelId) {
+    return customSelect(
+      'SELECT MAX(ls.id) AS latest_id, ls.owner_channel_id, ls.owner_channel_name '
+      'FROM live_streams ls '
+      "WHERE ls.owner_channel_id != '' "
+      'AND ls.live_chat_id IN ('
+      '  SELECT DISTINCT cm.live_chat_id FROM chat_messages cm WHERE cm.channel_id = ?'
+      ') '
+      'GROUP BY ls.owner_channel_id, ls.owner_channel_name '
+      'ORDER BY latest_id DESC',
+      variables: [Variable.withString(viewerChannelId)],
+      readsFrom: {liveStreams, chatMessages},
+    ).watch().map((rows) => rows
+        .map(
+          (row) => OwnerChannelSummary(
+            ownerChannelId: row.read<String>('owner_channel_id'),
+            ownerChannelName: row.read<String>('owner_channel_name'),
+          ),
+        )
+        .toList());
   }
 
   /// Stream-based version of distinctOwnerChannels for reactive UI.
