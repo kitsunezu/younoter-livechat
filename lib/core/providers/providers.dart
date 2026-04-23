@@ -55,6 +55,59 @@ final chatMessagesProvider =
   return db.chatMessageDao.watchMessages(liveChatId);
 });
 
+/// Search query for the chat search popup.
+final chatMessageSearchQueryProvider = StateProvider<String>((ref) => '');
+
+/// Search result status filter for the chat search popup.
+enum ChatSearchFilter { all, unread, read }
+
+final chatSearchFilterProvider =
+    StateProvider<ChatSearchFilter>((ref) => ChatSearchFilter.all);
+
+/// Read chat message ids tracked in memory for the current live session.
+final chatSearchReadMessageIdsProvider =
+    StateProvider<Set<String>>((ref) => <String>{});
+
+typedef ChatSearchResult = ({
+  List<ChatMessage> allMessages,
+  List<ChatMessage> visibleMessages,
+});
+
+/// Chat search popup results derived from the live chat stream and local UI state.
+final chatSearchResultsProvider =
+    Provider.family<AsyncValue<ChatSearchResult>, String>((ref, liveChatId) {
+  final messagesAsync = ref.watch(chatMessagesProvider(liveChatId));
+  final normalizedQuery =
+      ref.watch(chatMessageSearchQueryProvider).trim().toLowerCase();
+  final filter = ref.watch(chatSearchFilterProvider);
+  final readMessageIds = ref.watch(chatSearchReadMessageIdsProvider);
+
+  return messagesAsync.whenData((messages) {
+    final matchingMessages = normalizedQuery.isEmpty
+        ? messages
+        : messages.where((message) {
+            return message.messageText
+                .toLowerCase()
+                .contains(normalizedQuery);
+          }).toList();
+
+    final visibleMessages = switch (filter) {
+      ChatSearchFilter.all => matchingMessages,
+      ChatSearchFilter.unread => matchingMessages
+          .where((message) => !readMessageIds.contains(message.id))
+          .toList(),
+      ChatSearchFilter.read => matchingMessages
+          .where((message) => readMessageIds.contains(message.id))
+          .toList(),
+    };
+
+    return (
+      allMessages: messages,
+      visibleMessages: visibleMessages,
+    );
+  });
+});
+
 /// Super chats stream from the database.
 final superChatsProvider =
     StreamProvider.family<List<SuperChat>, String>((ref, liveChatId) {

@@ -38,7 +38,7 @@ class YouNoterApp extends ConsumerWidget {
       theme: younoterLightTheme,
       darkTheme: younoterDarkTheme,
       themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-      locale: Locale(locale),
+      locale: SettingsService.resolveLocale(locale),
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       routerConfig: appRouter,

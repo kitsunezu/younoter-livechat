@@ -7,6 +7,7 @@ import '../../core/youtube/currency_utils.dart';
 import '../../core/youtube/live_chat_manager.dart';
 import '../../l10n/app_localizations.dart';
 import '../viewers/viewer_detail_panel.dart';
+import 'chat_search_dialog.dart';
 import 'chat_message_text.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -20,6 +21,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final _urlController = TextEditingController();
   final _scrollController = ScrollController();
   bool _atBottom = true;
+  bool _isSearchPanelOpen = false;
+  bool _isDraggingSearchPanel = false;
+  double? _compactSearchPanelTop;
+  String? _lastLiveChatId;
 
   @override
   void initState() {
@@ -46,6 +51,80 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     ref.read(liveChatManagerProvider).disconnect();
   }
 
+  void _toggleSearchPanel() {
+    setState(() {
+      _isSearchPanelOpen = !_isSearchPanelOpen;
+      _isDraggingSearchPanel = false;
+      _compactSearchPanelTop = null;
+    });
+  }
+
+  void _closeSearchPanel() {
+    if (_isSearchPanelOpen) {
+      setState(() {
+        _isSearchPanelOpen = false;
+        _isDraggingSearchPanel = false;
+        _compactSearchPanelTop = null;
+      });
+    }
+  }
+
+  void _settleSearchPanel({required bool close, double? fallbackTop}) {
+    setState(() {
+      _isDraggingSearchPanel = false;
+      if (close) {
+        _isSearchPanelOpen = false;
+        _compactSearchPanelTop = null;
+      } else if (fallbackTop != null && _compactSearchPanelTop == null) {
+        _compactSearchPanelTop = fallbackTop;
+      }
+    });
+  }
+
+  void _handleSearchPanelDragStart(double defaultTop) {
+    if (!_isSearchPanelOpen) return;
+    setState(() {
+      _isDraggingSearchPanel = true;
+      _compactSearchPanelTop ??= defaultTop;
+    });
+  }
+
+  void _handleSearchPanelDragUpdate(
+    DragUpdateDetails details, {
+    required double defaultTop,
+    required double minTop,
+    required double maxTop,
+  }) {
+    if (!_isSearchPanelOpen) return;
+    final delta = details.primaryDelta ?? 0;
+    final currentTop = _compactSearchPanelTop ?? defaultTop;
+    final nextTop = (currentTop + delta).clamp(minTop, maxTop).toDouble();
+    if (nextTop == currentTop) return;
+    setState(() => _compactSearchPanelTop = nextTop);
+  }
+
+  void _handleSearchPanelDragEnd(
+    DragEndDetails details, {
+    required double defaultTop,
+  }) {
+    if (!_isSearchPanelOpen) return;
+    final velocity = details.primaryVelocity ?? 0;
+    final shouldClose = velocity > 900;
+
+    _settleSearchPanel(
+      close: shouldClose,
+      fallbackTop: defaultTop,
+    );
+  }
+
+  void _handleSearchPanelDragCancel({required double defaultTop}) {
+    if (!_isSearchPanelOpen) return;
+    _settleSearchPanel(
+      close: false,
+      fallbackTop: defaultTop,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final statusAsync = ref.watch(chatStatusProvider);
@@ -56,6 +135,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isWide = MediaQuery.sizeOf(context).width >= 600;
+
+    if (_lastLiveChatId != liveChatId) {
+      _lastLiveChatId = liveChatId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _closeSearchPanel();
+        ref.read(chatMessageSearchQueryProvider.notifier).state = '';
+        ref.read(chatSearchFilterProvider.notifier).state =
+            ChatSearchFilter.all;
+        ref.read(chatSearchReadMessageIdsProvider.notifier).state = {};
+      });
+    }
 
     // On mobile, show bottom sheet when viewer is selected
     ref.listen<String?>(selectedViewerIdProvider, (prev, next) {
@@ -117,30 +208,173 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       )
                     : Stack(
                         children: [
-                          _ChatMessageList(
-                            liveChatId: liveChatId,
-                            ownerChannelId:
-                                manager.currentOwnerChannelId ?? '',
-                            scrollController: _scrollController,
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final isCompactLayout = constraints.maxWidth < 600;
+                              final compactPanelDefaultTop =
+                                  (constraints.maxHeight * 0.14)
+                                      .clamp(72.0, 160.0)
+                                      .toDouble();
+                              final compactPanelMinHeight =
+                                  (constraints.maxHeight * 0.42)
+                                      .clamp(240.0, 420.0)
+                                      .toDouble();
+                              final compactPanelMaxTop =
+                                  (constraints.maxHeight - compactPanelMinHeight)
+                                      .clamp(
+                                        compactPanelDefaultTop,
+                                        constraints.maxHeight - 120.0,
+                                      )
+                                      .toDouble();
+                              final compactPanelTop = isCompactLayout
+                                  ? (_compactSearchPanelTop ?? compactPanelDefaultTop)
+                                      .clamp(
+                                        compactPanelDefaultTop,
+                                        compactPanelMaxTop,
+                                      )
+                                      .toDouble()
+                                  : compactPanelDefaultTop;
+                              final compactDragProgress = isCompactLayout &&
+                                      compactPanelMaxTop > compactPanelDefaultTop
+                                  ? ((compactPanelTop - compactPanelDefaultTop) /
+                                          (compactPanelMaxTop - compactPanelDefaultTop))
+                                      .clamp(0.0, 1.0)
+                                  : 0.0;
+                              final panelWidth = constraints.maxWidth > 960
+                                  ? 420.0
+                                  : constraints.maxWidth > 760
+                                      ? 360.0
+                                      : constraints.maxWidth * 0.82;
+
+                              return Stack(
+                                children: [
+                                  _ChatMessageList(
+                                    liveChatId: liveChatId,
+                                    ownerChannelId:
+                                        manager.currentOwnerChannelId ?? '',
+                                    scrollController: _scrollController,
+                                  ),
+                                  if (_isSearchPanelOpen && isCompactLayout)
+                                    Positioned.fill(
+                                      child: GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: _closeSearchPanel,
+                                        child: ColoredBox(
+                                          color: colorScheme.scrim
+                                              .withValues(
+                                                alpha: 0.18 *
+                                                    (1 - compactDragProgress),
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                  AnimatedPositioned(
+                                    duration: _isDraggingSearchPanel
+                                        ? Duration.zero
+                                        : const Duration(milliseconds: 220),
+                                    curve: Curves.easeOutCubic,
+                                    top: isCompactLayout
+                                      ? (_isSearchPanelOpen
+                                        ? compactPanelTop
+                                        : constraints.maxHeight)
+                                        : 12,
+                                    bottom: isCompactLayout
+                                        ? (_isSearchPanelOpen
+                                        ? 0
+                                            : -constraints.maxHeight)
+                                        : 12,
+                                    right: isCompactLayout
+                                      ? 0
+                                        : (_isSearchPanelOpen ? 12 : -(panelWidth + 24)),
+                                    left: isCompactLayout
+                                      ? 0
+                                        : null,
+                                    width: isCompactLayout ? null : panelWidth,
+                                    child: IgnorePointer(
+                                      ignoring: !_isSearchPanelOpen,
+                                      child: AnimatedOpacity(
+                                        duration:
+                                            const Duration(milliseconds: 160),
+                                        opacity: _isSearchPanelOpen ? 1 : 0,
+                                        child: ChatSearchPanel(
+                                          liveChatId: liveChatId,
+                                          onClose: _closeSearchPanel,
+                                          compactLayout: isCompactLayout,
+                                          onDragStart: isCompactLayout
+                                              ? (_) => _handleSearchPanelDragStart(
+                                                  compactPanelTop,
+                                                )
+                                              : null,
+                                          onDragUpdate: isCompactLayout
+                                              ? (details) =>
+                                                  _handleSearchPanelDragUpdate(
+                                                    details,
+                                                    defaultTop:
+                                                        compactPanelTop,
+                                                    minTop:
+                                                        compactPanelDefaultTop,
+                                                    maxTop: compactPanelMaxTop,
+                                                  )
+                                              : null,
+                                          onDragEnd: isCompactLayout
+                                              ? (details) =>
+                                                  _handleSearchPanelDragEnd(
+                                                    details,
+                                                    defaultTop: compactPanelTop,
+                                                  )
+                                              : null,
+                                          onDragCancel: isCompactLayout
+                                              ? () =>
+                                                  _handleSearchPanelDragCancel(
+                                                    defaultTop: compactPanelTop,
+                                                  )
+                                              : null,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (!_isSearchPanelOpen)
+                                    Positioned(
+                                      top: 12,
+                                      right: 16,
+                                      child: Material(
+                                        elevation: 6,
+                                        color: Colors.transparent,
+                                        shape: const CircleBorder(),
+                                        child: IconButton.filledTonal(
+                                          onPressed: _toggleSearchPanel,
+                                          tooltip: AppLocalizations.of(context)!
+                                              .searchMessages,
+                                          icon: const Icon(Icons.search),
+                                        ),
+                                      ),
+                                    ),
+                                  if (!_atBottom)
+                                    Positioned(
+                                      bottom: 16,
+                                      right: _isSearchPanelOpen
+                                          ? isCompactLayout
+                                              ? -80
+                                              : panelWidth + 28
+                                          : 16,
+                                      child: FloatingActionButton.small(
+                                        onPressed: () =>
+                                            _scrollController.animateTo(
+                                          0,
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          curve: Curves.easeOut,
+                                        ),
+                                        tooltip: AppLocalizations.of(context)!
+                                            .scrollToLatest,
+                                        child: const Icon(
+                                            Icons.keyboard_double_arrow_down),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
                           ),
-                          if (!_atBottom)
-                            Positioned(
-                              bottom: 16,
-                              right: 16,
-                              child: FloatingActionButton.small(
-                                onPressed: () =>
-                                    _scrollController.animateTo(
-                                  0,
-                                  duration:
-                                      const Duration(milliseconds: 300),
-                                  curve: Curves.easeOut,
-                                ),
-                                tooltip: AppLocalizations.of(context)!
-                                    .scrollToLatest,
-                                child: const Icon(
-                                    Icons.keyboard_double_arrow_down),
-                              ),
-                            ),
                         ],
                       ),
               ),

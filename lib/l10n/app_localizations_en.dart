@@ -120,6 +120,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchHint => 'Search...';
 
   @override
+  String get searchMessages => 'Search messages';
+
+  @override
+  String get noMatchingMessages => 'No matching messages';
+
+  @override
+  String get markUnread => 'Mark unread';
+
+  @override
   String get sortByAmount => 'Sort by Amount';
 
   @override

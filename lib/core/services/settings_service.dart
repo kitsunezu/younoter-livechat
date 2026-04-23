@@ -1,8 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../providers/providers.dart';
 
 class SettingsService {
+  static const traditionalChineseLocale = 'zh-Hant';
   static const _keyThemeDark = 'theme_dark';
   static const _keyLocale = 'locale';
   static const _keyAlwaysOnTop = 'always_on_top';
@@ -20,8 +22,27 @@ class SettingsService {
   static bool get isDark => _prefs.getBool(_keyThemeDark) ?? true;
   static set isDark(bool v) => _prefs.setBool(_keyThemeDark, v);
 
-  static String get locale => _prefs.getString(_keyLocale) ?? 'en';
-  static set locale(String v) => _prefs.setString(_keyLocale, v);
+  static String normalizeLocale(String locale) {
+    if (locale == 'zh') {
+      return traditionalChineseLocale;
+    }
+    return locale;
+  }
+
+  static Locale resolveLocale(String locale) {
+    switch (normalizeLocale(locale)) {
+      case traditionalChineseLocale:
+        return const Locale.fromSubtags(
+          languageCode: 'zh',
+          scriptCode: 'Hant',
+        );
+      default:
+        return Locale(normalizeLocale(locale));
+    }
+  }
+
+  static String get locale => normalizeLocale(_prefs.getString(_keyLocale) ?? 'en');
+  static set locale(String v) => _prefs.setString(_keyLocale, normalizeLocale(v));
 
   static bool get alwaysOnTop => _prefs.getBool(_keyAlwaysOnTop) ?? false;
   static set alwaysOnTop(bool v) => _prefs.setBool(_keyAlwaysOnTop, v);

@@ -120,6 +120,15 @@ class AppLocalizationsKo extends AppLocalizations {
   String get searchHint => '검색...';
 
   @override
+  String get searchMessages => '메시지 검색';
+
+  @override
+  String get noMatchingMessages => '일치하는 메시지가 없습니다';
+
+  @override
+  String get markUnread => '읽지 않음으로 표시';
+
+  @override
   String get sortByAmount => '금액순';
 
   @override

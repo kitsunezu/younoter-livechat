@@ -120,6 +120,15 @@ class AppLocalizationsJa extends AppLocalizations {
   String get searchHint => '検索...';
 
   @override
+  String get searchMessages => 'メッセージを検索';
+
+  @override
+  String get noMatchingMessages => '一致するメッセージがありません';
+
+  @override
+  String get markUnread => '未読にする';
+
+  @override
   String get sortByAmount => '金額順';
 
   @override

@@ -120,6 +120,15 @@ class AppLocalizationsPt extends AppLocalizations {
   String get searchHint => 'Pesquisar...';
 
   @override
+  String get searchMessages => 'Pesquisar mensagens';
+
+  @override
+  String get noMatchingMessages => 'Nenhuma mensagem encontrada';
+
+  @override
+  String get markUnread => 'Marcar como não lido';
+
+  @override
   String get sortByAmount => 'Por valor';
 
   @override

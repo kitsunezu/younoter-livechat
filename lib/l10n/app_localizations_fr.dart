@@ -120,6 +120,15 @@ class AppLocalizationsFr extends AppLocalizations {
   String get searchHint => 'Rechercher...';
 
   @override
+  String get searchMessages => 'Rechercher des messages';
+
+  @override
+  String get noMatchingMessages => 'Aucun message correspondant';
+
+  @override
+  String get markUnread => 'Marquer comme non lu';
+
+  @override
   String get sortByAmount => 'Par montant';
 
   @override

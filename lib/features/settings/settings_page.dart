@@ -215,7 +215,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           },
           dropdownMenuEntries: const [
             DropdownMenuEntry(value: 'en', label: 'English'),
-            DropdownMenuEntry(value: 'zh', label: '繁體中文'),
+            DropdownMenuEntry(
+              value: SettingsService.traditionalChineseLocale,
+              label: '繁體中文',
+            ),
             DropdownMenuEntry(value: 'ja', label: '日本語'),
             DropdownMenuEntry(value: 'ko', label: '한국어'),
             DropdownMenuEntry(value: 'es', label: 'Español'),
